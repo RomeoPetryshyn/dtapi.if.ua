@@ -1,6 +1,7 @@
 import { Component, OnInit, Inject } from '@angular/core';
 import { FormGroup, FormControl, Validators, ValidatorFn, ValidationErrors } from '@angular/forms';
 import { StudentsService } from '../services/students.service';
+import { ApiService } from 'src/app/shared/services/api.service';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material';
 import { of } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -49,6 +50,7 @@ export class StudentsModalWindowComponent implements OnInit {
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: any,
     private studentsHttpService: StudentsService,
+    private apiService: ApiService,
     public dialogRef: MatDialogRef<StudentsModalWindowComponent>,
   ) { }
 
@@ -73,13 +75,13 @@ export class StudentsModalWindowComponent implements OnInit {
         plain_password: value.password
     };
     if (this.data.updateStudent == true) {
-        this.studentsHttpService.updateStudent(this.data.student_data.user_id, studentDATA).subscribe(
+        this.apiService.updEntity('Student', studentDATA, this.data.student_data.user_id).subscribe(
           (data: ResponseInterface) => this.dialogRef.close(data),
           error => this.dialogRef.close(error)
       );
       return;
     } else {
-        this.studentsHttpService.createStudent(studentDATA).subscribe(
+        this.apiService.createEntity('Student', studentDATA).subscribe(
           (data) => this.dialogRef.close(data),
           error => this.dialogRef.close(error)
     );
@@ -105,35 +107,27 @@ export class StudentsModalWindowComponent implements OnInit {
 
   uniqueValidator(prop, method) {
     return (control: FormControl) => {
-      if(this.data.student_data){
-        if(prop === 'gradebookID'){
-          if ( this.data.student_data.gradebook_id === control.value) {
-            return of(null);
-          }
-        }
-        if(prop === 'login'){
-          if ( this.username === control.value) {
-            return of(null);
-          }
-        }
-        if(prop === 'email'){
-          if ( this.email === control.value) {
-            return of(null);
-          }
-        }
+      if(!this.data.student_data){
+        console.log(this.data.student_data);
+        return this.studentsHttpService[method](control.value)
+          .pipe(
+            map((result: any) => {
+              return result.response ? { propertyIsNotUnique: true } : null;
+            })
+          );
+      } else if(prop === 'gradebookID' && this.data.student_data.gradebook_id === control.value){
+            console.log(control.value);  return of(null);
+      } else if(prop === 'login' && this.username === control.value){
+        console.log(control.value); return of(null);
+      } else   if(prop === 'email' && this.email === control.value){
+        console.log(control.value); return of(null);
       }
-      return this.studentsHttpService[method](control.value)
-        .pipe(
-          map((result: any) => {
-            return result.response ? { propertyIsNotUnique: true } : null;
-          })
-        );
-    };
-  }
+    }
+  };
 
   getUserData(){
     if(this.data.student_data){
-      this.studentsHttpService.getUserInfo(this.data.student_data.user_id).subscribe((result: any) =>{
+      this.apiService.getEntity('AdminUser', this.data.student_data.user_id).subscribe((result: any) =>{
         this.username = result[0].username;
         this.email = result[0].email;
       });
@@ -142,7 +136,7 @@ export class StudentsModalWindowComponent implements OnInit {
 
   setUserValues(){
     if(this.data.student_data){
-      this.studentsHttpService.getUserInfo(this.data.student_data.user_id).subscribe((result: any) =>{
+      this.apiService.getEntity('AdminUser', this.data.student_data.user_id).subscribe((result: any) =>{
         this.studentForm.get('login').setValue(result[0].username, { onlySelf: true });
         this.studentForm.get('email').setValue(result[0].email, { onlySelf: true });
       });
